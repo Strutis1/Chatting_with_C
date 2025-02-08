@@ -10,9 +10,28 @@ void initialize_winsock() {
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) {
         printf("Winsock initialization failed! Error Code: %d\n", WSAGetLastError());
-        exit(EXIT_FAILURE);
+        exit(1);
     }
 }
+
+
+DWORD WINAPI receiveMessages(void* socket) {
+    int sock = *(int*)socket;
+    char buffer[255];
+
+    while (1) {
+        memset(buffer, 0, sizeof(buffer));
+        int bytes = recv(sock, buffer, sizeof(buffer) - 1, 0);
+        if (bytes <= 0) break;
+        buffer[bytes] = '\0';
+        printf("[Server]: %s\n", buffer);
+    }
+
+    printf("Server disconnected.\n");
+    closesocket(sock);
+    return 0;
+}
+
 
 int main(int argc, char const* argv[]) 
 { 
@@ -42,8 +61,7 @@ int main(int argc, char const* argv[])
 	servAddr.sin_port = htons(port);
     servAddr.sin_addr.s_addr = inet_addr(argv[2]);
 
-	int connectStatus = connect(sockD, (struct sockaddr*)&servAddr, 
-				sizeof(servAddr)); 
+	int connectStatus = connect(sockD, (struct sockaddr*)&servAddr, sizeof(servAddr)); 
 
 	if (connectStatus == -1) { 
 		printf("Error...\n"); 
@@ -56,6 +74,15 @@ int main(int argc, char const* argv[])
 
 		printf("Message: %s\n", strData); 
 	} 
+
+   HANDLE thread = CreateThread(NULL, 0, receiveMessages, &sockD, 0, NULL);
+
+    char buffer[255];
+    while (1) {
+        fgets(buffer, sizeof(buffer), stdin);
+        buffer[strcspn(buffer, "\n")] = 0;
+        send(sockD, buffer, strlen(buffer), 0);
+    }
 
     closesocket(sockD);
     WSACleanup();
